@@ -1,3 +1,4 @@
+import uuid
 from pathlib import Path
 from uuid import uuid4
 
@@ -5,6 +6,7 @@ import pymupdf
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from backend.score_processor import process_score
 
 # Project directories
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -77,3 +79,28 @@ async def upload_sheet_music(file: UploadFile = File(...)):
 
     except pymupdf.FileDataError:
         raise HTTPException(status_code=400, detail="Unable to read this PDF.")
+
+@app.post("/analyze/{file_id}")
+def analyze_score(file_id: str):
+    # Validate the file ID
+    try:
+        pdf_id = str(uuid.UUID(file_id))
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid file ID")
+
+    pdf_path = UPLOAD_DIR / f"{pdf_id}.pdf"
+
+    if not pdf_path.exists():
+        raise HTTPException(status_code=404, detail="PDF not found")
+
+    output_dir = Path("output") / pdf_id
+
+    try:
+        movements = process_score(pdf_path, output_dir)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    return {
+        "file_id": pdf_id,
+        "movements": movements
+    }
