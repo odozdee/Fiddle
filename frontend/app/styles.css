@@ -1,0 +1,22 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: #faf8f5;
+  color: #302832;
+  font-family: Arial, sans-serif;
+  line-height: 1.6;
+}
+
+main {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 64px 24px;
+}
+
+h1 {
+  margin: 8px 0;
+  font-size: 48px;
+}
