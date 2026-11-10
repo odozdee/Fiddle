@@ -13,3 +13,5 @@ output/
 *.log
 .DS_Store
 Thumbs.db
+frontend/.env*
+!frontend/.env.example
