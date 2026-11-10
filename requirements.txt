@@ -3,3 +3,5 @@ uvicorn
 python-multipart
 pymupdf
 music21
+anthropic
+python-dotenv

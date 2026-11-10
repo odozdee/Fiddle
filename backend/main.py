@@ -7,6 +7,7 @@ from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from backend.score_processor import process_score
+from backend.teach import generate_practice_tips
 
 # Project directories
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -103,4 +104,30 @@ def analyze_score(file_id: str):
     return {
         "file_id": pdf_id,
         "movements": movements
+    }
+
+@app.post("/practice-tips/{file_id}")
+def practice_tips(file_id: str):
+    try:
+        pdf_id = str(uuid.UUID(file_id))
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid file ID")
+
+    pdf_path = UPLOAD_DIR / f"{pdf_id}.pdf"
+
+    if not pdf_path.exists():
+        raise HTTPException(status_code=404, detail="PDF not found")
+
+    output_dir = Path("output") / pdf_id
+
+    try:
+        movements = process_score(pdf_path, output_dir)
+        tips = generate_practice_tips(movements)
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Practice analysis failed: {e}")
+
+    return {
+        "file_id": pdf_id,
+        "practice_tips": tips
     }
