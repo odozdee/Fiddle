@@ -1,22 +1,42 @@
-* {
-  box-sizing: border-box;
-}
-
-body {
-  margin: 0;
-  background: #faf8f5;
-  color: #302832;
+:root {
+  --ink: #302832;
+  --muted: #6e6168;
+  --plum: #3b243b;
+  --accent: #a9543b;
+  --line: #e9dfd9;
+  --paper: #fffdf9;
   font-family: Arial, sans-serif;
-  line-height: 1.6;
+  color: var(--ink);
+  background: #faf8f5;
 }
 
-main {
-  max-width: 960px;
-  margin: 0 auto;
-  padding: 64px 24px;
-}
+* { box-sizing: border-box; }
+body { margin: 0; line-height: 1.6; }
+a { color: inherit; text-underline-offset: 0.2em; }
+button, input { font: inherit; }
+button { cursor: pointer; }
+button:disabled { cursor: default; opacity: 0.55; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 4px; }
+.site-width { width: min(70rem, calc(100% - 3rem)); margin-inline: auto; }
+main { max-width: 70rem; margin: 0 auto; padding: 48px 24px; }
+main.site-width { padding-inline: 0; }
+h1 { margin: 8px 0; font: 400 clamp(2.4rem, 6vw, 3.5rem)/1.1 Georgia, serif; }
+h2 { font: 400 1.7rem Georgia, serif; }
+.eyebrow { color: var(--accent); font-size: 0.75rem; letter-spacing: 0.12em; }
+.topbar { position: sticky; top: 0; z-index: 10; background: #faf8f5f5; border-bottom: 1px solid var(--line); }
+.topbar-inner { min-height: 5rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem; padding-block: 0.8rem; }
+.wordmark { font: 700 1.7rem Georgia, serif; text-decoration: none; }
+.site-nav { display: flex; flex-wrap: wrap; gap: 1.1rem; font-size: 0.9rem; }
+.workspace { display: grid; grid-template-columns: 1fr 1fr; gap: 1.3rem; margin-top: 1.5rem; }
+.panel { min-width: 0; padding: 1.5rem; border: 1px solid var(--line); border-radius: 0.9rem; background: var(--paper); }
+.upload-form { display: grid; justify-items: start; gap: 0.9rem; margin-top: 2rem; }
+.upload-form input { max-width: 100%; }
+.primary-button { display: inline-flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 0.8rem 1rem; border: 0; border-radius: 0.6rem; background: var(--plum); color: white; text-decoration: none; font-size: 0.9rem; }
+.primary-button:hover:not(:disabled) { background: #573653; }
+.score-preview { display: block; width: 100%; height: auto; margin-top: 1rem; border: 1px solid var(--line); }
+.error { color: #962c28; }
+.tips { margin-top: 1.5rem; overflow-wrap: anywhere; }
 
-h1 {
-  margin: 8px 0;
-  font-size: 48px;
+@media (max-width: 43rem) {
+  .workspace { grid-template-columns: 1fr; }
 }

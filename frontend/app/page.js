@@ -1,9 +1,12 @@
+import Link from "next/link";
+
 export default function Home() {
   return (
     <main>
-      <p>Violin practice</p>
+      <p className="eyebrow">VIOLIN PRACTICE</p>
       <h1>Fiddle</h1>
-      <p>Your violin practice studio is coming soon.</p>
+      <p>Upload your sheet music, read the score, and find passages to practice.</p>
+      <Link className="primary-button" href="/practice">Open Practice Studio ↗</Link>
     </main>
   );
 }
