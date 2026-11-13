@@ -23,14 +23,16 @@ async function post(path, body) {
 export default function PracticePage() {
   const [file, setFile] = useState(null);
   const [score, setScore] = useState(null);
-  const [tips, setTips] = useState("");
+  const [page, setPage] = useState(1);
+  const [pageResults, setPageResults] = useState({});
   const [busy, setBusy] = useState(null);
   const [error, setError] = useState("");
 
   function selectFile(event) {
     setFile(event.target.files[0] ?? null);
     setScore(null);
-    setTips("");
+    setPage(1);
+    setPageResults({});
     setError("");
   }
 
@@ -43,11 +45,15 @@ export default function PracticePage() {
     }
     setBusy("upload");
     setError("");
-    setTips("");
+    setPage(1);
+    setPageResults({});
     const body = new FormData();
     body.append("file", file);
     try {
-      setScore(await post("/upload", body));
+      const uploaded = await post("/upload", body);
+      setScore(uploaded);
+      const numbers = Array.from({ length: uploaded.page_count }, (_, index) => index + 1);
+      await generateTips(uploaded, numbers);
     } catch (failure) {
       setError(failure.message);
     } finally {
@@ -55,19 +61,32 @@ export default function PracticePage() {
     }
   }
 
-  async function generateTips() {
+  async function generateTips(uploaded, numbers) {
+    for (const number of numbers) {
+      setBusy(number);
+      let result;
+      try {
+        result = await post(`/scores/${encodeURIComponent(uploaded.file_id)}/pages/${number}/practice-tips`);
+      } catch (failure) {
+        result = { error: failure.message };
+      }
+      setPageResults((previous) => ({ ...previous, [number]: result }));
+    }
+  }
+
+  async function retryPage() {
     if (!score || busy) return;
-    setBusy("tips");
-    setError("");
     try {
-      const result = await post(`/practice-tips/${encodeURIComponent(score.file_id)}`);
-      setTips(result.practice_tips || "No specific practice tips were returned.");
-    } catch (failure) {
-      setError(failure.message);
+      await generateTips(score, [page]);
     } finally {
       setBusy(null);
     }
   }
+
+  const result = pageResults[page];
+  const previewPath = score && (page === 1
+    ? score.preview_url
+    : `/scores/${encodeURIComponent(score.file_id)}/pages/${page}/preview`);
 
   return (
     <main className="site-width">
@@ -83,14 +102,31 @@ export default function PracticePage() {
       <div className="workspace">
         <section className="panel" aria-labelledby="score-title">
           <h2 id="score-title">Score preview</h2>
-          {score ? <><p>{file.name} · {score.page_count} {score.page_count === 1 ? "page" : "pages"}</p><a href={new URL(`/files/${encodeURIComponent(score.file_id)}.pdf`, apiUrl).href}>Open PDF ↗</a><img className="score-preview" src={new URL(score.preview_url, apiUrl).href} alt="First page of your uploaded score" /></> : <p>Upload a PDF to see the first page here.</p>}
+          {score ? (
+            <>
+              <p>{file.name} · Page {page} of {score.page_count}</p>
+              <a href={new URL(`/files/${encodeURIComponent(score.file_id)}.pdf`, apiUrl).href}>Open PDF ↗</a>
+              {score.page_count > 1 && (
+                <nav className="page-controls" aria-label="Score pages">
+                  <button type="button" disabled={page === 1} onClick={() => setPage(page - 1)}>Previous page</button>
+                  <button type="button" disabled={page === score.page_count} onClick={() => setPage(page + 1)}>Next page</button>
+                </nav>
+              )}
+              <img className="score-preview" src={new URL(previewPath, apiUrl).href} alt={`Page ${page} of your uploaded score`} />
+            </>
+          ) : <p>Upload a PDF to see your score here.</p>}
         </section>
-        <section className="panel" aria-labelledby="tips-title" aria-busy={busy === "tips"}>
-          <h2 id="tips-title">Practice tips</h2>
-          <p>Get suggestions for passages near the beginning of your score.</p>
-          <button className="primary-button" type="button" disabled={!score || Boolean(busy)} onClick={generateTips}>{busy === "tips" ? "Generating tips…" : tips ? "Generate tips again" : "Generate practice tips"}</button>
-          {busy === "tips" && <p role="status">Reading the notation and generating advice…</p>}
-          {tips && <div className="tips"><Markdown>{tips}</Markdown></div>}
+        <section className="panel" aria-labelledby="tips-title" aria-busy={busy === page}>
+          <h2 id="tips-title">{score ? `Practice tips · Page ${page}` : "Practice tips"}</h2>
+          {typeof busy === "number" && <p role="status">Analyzing page {busy} of {score.page_count}…</p>}
+          {!score && <p>Upload a score to generate tips for every page.</p>}
+          {score && !result && busy !== page && <p>This page is waiting for analysis.</p>}
+          {result?.error && <p className="error" role="alert">{result.error}</p>}
+          {result?.warning && <p>{result.warning}</p>}
+          {result && !result.error && (
+            <div className="tips"><Markdown>{result.practice_tips?.trim() || "No specific practice tips were returned."}</Markdown></div>
+          )}
+          {result?.error && <button className="primary-button" type="button" onClick={retryPage} disabled={Boolean(busy)}>Retry this page</button>}
         </section>
       </div>
     </main>

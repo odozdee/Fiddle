@@ -1,13 +1,18 @@
+import logging
 import uuid
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from uuid import uuid4
 
 import pymupdf
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
 from fastapi.staticfiles import StaticFiles
-from backend.score_processor import process_score
+from backend.score_processor import NoMusicXML, process_score
 from backend.teach import generate_practice_tips
+
+logger = logging.getLogger(__name__)
 
 # Project directories
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -131,3 +136,58 @@ def practice_tips(file_id: str):
         "file_id": pdf_id,
         "practice_tips": tips
     }
+
+def score_pdf_path(file_id):
+    try:
+        pdf_id = str(uuid.UUID(file_id))
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid file ID")
+    path = UPLOAD_DIR / f"{pdf_id}.pdf"
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="PDF not found")
+    return path
+
+def page_index(document, page_number):
+    if not 1 <= page_number <= document.page_count:
+        raise HTTPException(status_code=404, detail="Page not found")
+    return page_number - 1
+
+@app.get("/scores/{file_id}/pages/{page_number}/preview")
+def page_preview(file_id: str, page_number: int):
+    with pymupdf.open(score_pdf_path(file_id)) as document:
+        page = document[page_index(document, page_number)]
+        preview = page.get_pixmap(dpi=144).tobytes("png")
+    return Response(preview, media_type="image/png")
+
+@app.post("/scores/{file_id}/pages/{page_number}/practice-tips")
+def page_practice_tips(file_id: str, page_number: int):
+    with TemporaryDirectory() as directory:
+        page_pdf = Path(directory) / "page.pdf"
+        with pymupdf.open(score_pdf_path(file_id)) as document:
+            index = page_index(document, page_number)
+            page = document[index]
+            zoom = min(2.0, 1568 / max(page.rect.width, page.rect.height))
+            image = page.get_pixmap(matrix=pymupdf.Matrix(zoom, zoom)).tobytes("jpeg", jpg_quality=60)
+            with pymupdf.open() as single_page:
+                single_page.insert_pdf(document, from_page=index, to_page=index)
+                single_page.save(page_pdf)
+
+        warning = ""
+        try:
+            try:
+                movements = process_score(page_pdf, Path(directory) / "output")
+            except NoMusicXML:
+                movements = []
+                warning = "Audiveris found no readable notation. Tips use the page image alone."
+            if any(
+                measure["overlapping_voices"]
+                for movement in movements
+                for measure in movement["measures"]
+            ):
+                warning = "Audiveris found overlapping voices. Compare those passages with the original notation."
+            tips = generate_practice_tips(movements, page_image=image, page_number=page_number)
+        except Exception as error:
+            logger.exception("Could not analyze PDF page %s", page_number)
+            raise HTTPException(status_code=500, detail="Page analysis failed") from error
+
+    return {"page_number": page_number, "practice_tips": tips, "warning": warning}
